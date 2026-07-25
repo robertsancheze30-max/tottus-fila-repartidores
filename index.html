@@ -430,8 +430,10 @@
         btn2.style.color = "#a6740a";
         btn2.style.borderColor = "#e0c98a";
         btn2.onclick = () => {
-          if (confirm("¿Confirmas que quieres salir de la fila temporalmente? Cuando vuelvas deberás marcar llegada de nuevo.")) {
+          if (confirm("¿Confirmas que quieres salir de la fila temporalmente? Cuando vuelvas deberás escribir tu nombre y marcar llegada de nuevo.")) {
             queueRef.child(entry.key).remove();
+            localStorage.removeItem("tottus_saved_name");
+            nameInput.value = "";
           }
         };
 
