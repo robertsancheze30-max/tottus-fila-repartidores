@@ -417,7 +417,12 @@
         btn1.style.marginTop = "10px";
         btn1.onclick = () => {
           if (confirm("¿Confirmas que recibiste tus pedidos y sales de la fila?")) {
+            localStorage.removeItem("tottus_my_entry");
             queueRef.child(entry.key).remove();
+            arriveBtn.style.display = "block";
+            arriveBtn.disabled = !insideRadius;
+            arriveBtn.textContent = "Marcar llegada";
+            renderQueue(lastEntries.filter((e) => e.key !== entry.key));
           }
         };
 
@@ -431,9 +436,15 @@
         btn2.style.borderColor = "#e0c98a";
         btn2.onclick = () => {
           if (confirm("¿Confirmas que quieres salir de la fila temporalmente? Cuando vuelvas deberás escribir tu nombre y marcar llegada de nuevo.")) {
-            queueRef.child(entry.key).remove();
+            localStorage.removeItem("tottus_my_entry");
             localStorage.removeItem("tottus_saved_name");
+            queueRef.child(entry.key).remove();
             nameInput.value = "";
+            refreshNameUI();
+            arriveBtn.style.display = "block";
+            arriveBtn.disabled = !insideRadius;
+            arriveBtn.textContent = "Marcar llegada";
+            renderQueue(lastEntries.filter((e) => e.key !== entry.key));
           }
         };
 
