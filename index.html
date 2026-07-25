@@ -215,6 +215,11 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
   const queueRef = db.ref("queue");
+  const cooldownRef = db.ref("cooldown");
+
+  function safeKey(str) {
+    return str.trim().toLowerCase().replace(/[.#$\[\]\/\s]+/g, "_");
+  }
 
   // ---------- UBICACIÓN DEL SUPERMERCADO ----------
   const STORE_LAT = -34.1766919;
@@ -299,19 +304,10 @@
         if (dist <= RADIUS_METERS) {
           insideRadius = true;
           const mustLeave = localStorage.getItem("tottus_must_leave") === "1";
-          const pedidoTime = parseInt(localStorage.getItem("tottus_pedido_time") || "0", 10);
-          const minutesPassed = pedidoTime ? (Date.now() - pedidoTime) / 60000 : 999;
-          const minWaitOk = minutesPassed >= 20;
 
           if (mustLeave) {
             gpsDot.className = "dot bad";
             gpsText.textContent = "Debes salir del área del supermercado antes de volver a marcar llegada";
-            nameInput.disabled = true;
-            arriveBtn.disabled = true;
-          } else if (!minWaitOk) {
-            const minutosFaltan = Math.ceil(20 - minutesPassed);
-            gpsDot.className = "dot bad";
-            gpsText.textContent = `Debes esperar ${minutosFaltan} minuto(s) más antes de volver a marcar llegada`;
             nameInput.disabled = true;
             arriveBtn.disabled = true;
           } else {
@@ -363,30 +359,60 @@
       alert("Debes estar en el supermercado para marcar tu llegada");
       return;
     }
-    arriveBtn.disabled = true;
-    arriveBtn.textContent = "Marcando...";
 
-    const newRef = queueRef.push();
-    newRef
-      .set({
-        name: name,
-        timestamp: firebase.database.ServerValue.TIMESTAMP,
-      })
-      .then(() => {
-        localStorage.setItem("tottus_my_entry", newRef.key);
-        if (!saved) {
-          localStorage.setItem("tottus_saved_name", name);
-        }
-        nameInput.value = "";
-        refreshNameUI();
-        arriveBtn.style.display = "none";
-        renderQueue(lastEntries);
-      })
-      .catch((err) => {
-        alert("Error al marcar llegada: " + err.message);
+    // Verificar en la fila compartida (Firebase) si ese nombre ya está registrado,
+    // sin importar desde qué dispositivo/entrada se intente marcar de nuevo.
+    const normalizedName = name.trim().toLowerCase();
+    const alreadyInQueue = lastEntries.some(
+      (e) => (e.name || "").trim().toLowerCase() === normalizedName
+    );
+    if (alreadyInQueue) {
+      alert(`${name} ya tiene un registro activo en la fila. Debes salir primero (Salir a entregar / Ausentarme) antes de volver a marcar llegada.`);
+      return;
+    }
+
+    arriveBtn.disabled = true;
+    arriveBtn.textContent = "Verificando...";
+
+    // Verificar cooldown compartido (20 min tras "Salir a entregar"), sin importar el dispositivo
+    cooldownRef.child(safeKey(name)).once("value").then((snap) => {
+      const lastExit = snap.val();
+      const minutesPassed = lastExit ? (Date.now() - lastExit) / 60000 : 999;
+      if (lastExit && minutesPassed < 20) {
+        const minutosFaltan = Math.ceil(20 - minutesPassed);
+        alert(`Debes esperar ${minutosFaltan} minuto(s) más antes de volver a marcar llegada.`);
         arriveBtn.disabled = false;
         arriveBtn.textContent = "Marcar llegada";
-      });
+        return;
+      }
+
+      arriveBtn.textContent = "Marcando...";
+      const newRef = queueRef.push();
+      newRef
+        .set({
+          name: name,
+          timestamp: firebase.database.ServerValue.TIMESTAMP,
+        })
+        .then(() => {
+          localStorage.setItem("tottus_my_entry", newRef.key);
+          if (!saved) {
+            localStorage.setItem("tottus_saved_name", name);
+          }
+          nameInput.value = "";
+          refreshNameUI();
+          arriveBtn.style.display = "none";
+          renderQueue(lastEntries);
+        })
+        .catch((err) => {
+          alert("Error al marcar llegada: " + err.message);
+          arriveBtn.disabled = false;
+          arriveBtn.textContent = "Marcar llegada";
+        });
+    }).catch((err) => {
+      alert("Error al verificar: " + err.message);
+      arriveBtn.disabled = false;
+      arriveBtn.textContent = "Marcar llegada";
+    });
   });
 
   // ---------- ESCUCHAR FILA EN TIEMPO REAL ----------
@@ -441,8 +467,8 @@
           if (confirm("¿Confirmas que recibiste tus pedidos y sales de la fila?")) {
             localStorage.removeItem("tottus_my_entry");
             localStorage.setItem("tottus_must_leave", "1");
-            localStorage.setItem("tottus_pedido_time", String(Date.now()));
             queueRef.child(entry.key).remove();
+            cooldownRef.child(safeKey(entry.name)).set(firebase.database.ServerValue.TIMESTAMP);
             arriveBtn.style.display = "block";
             arriveBtn.disabled = true;
             arriveBtn.textContent = "Marcar llegada";
