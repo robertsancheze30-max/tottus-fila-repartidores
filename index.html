@@ -358,6 +358,7 @@
         nameInput.value = "";
         refreshNameUI();
         arriveBtn.style.display = "none";
+        renderQueue(lastEntries);
       })
       .catch((err) => {
         alert("Error al marcar llegada: " + err.message);
@@ -367,15 +368,9 @@
   });
 
   // ---------- ESCUCHAR FILA EN TIEMPO REAL ----------
-  queueRef.on("value", (snapshot) => {
-    const data = snapshot.val() || {};
-    const entries = Object.entries(data).map(([key, val]) => ({
-      key,
-      name: val.name,
-      timestamp: val.timestamp || 0,
-    }));
-    entries.sort((a, b) => a.timestamp - b.timestamp);
+  let lastEntries = [];
 
+  function renderQueue(entries) {
     queueCount.textContent = entries.length;
     queueList.innerHTML = "";
 
@@ -457,6 +452,18 @@
 
       queueList.appendChild(item);
     });
+  }
+
+  queueRef.on("value", (snapshot) => {
+    const data = snapshot.val() || {};
+    const entries = Object.entries(data).map(([key, val]) => ({
+      key,
+      name: val.name,
+      timestamp: val.timestamp || 0,
+    }));
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+    lastEntries = entries;
+    renderQueue(entries);
   });
 </script>
 
