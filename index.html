@@ -580,6 +580,21 @@
         topRow.innerHTML = item.innerHTML;
         item.innerHTML = "";
         item.appendChild(topRow);
+
+        if (entry.assigned) {
+          const banner = document.createElement("div");
+          banner.textContent = "✅ Ya puedes salir a entregar";
+          banner.style.background = "#0a8a3f";
+          banner.style.color = "#fff";
+          banner.style.fontWeight = "700";
+          banner.style.textAlign = "center";
+          banner.style.padding = "12px";
+          banner.style.borderRadius = "10px";
+          banner.style.marginTop = "10px";
+          banner.style.fontSize = "16px";
+          item.appendChild(banner);
+        }
+
         item.appendChild(btn1);
         item.appendChild(btn2);
       }
@@ -594,6 +609,7 @@
       key,
       name: val.name,
       timestamp: val.timestamp || 0,
+      assigned: !!val.assigned,
     }));
     entries.sort((a, b) => a.timestamp - b.timestamp);
     lastEntries = entries;
