@@ -472,7 +472,21 @@
     queueCount.textContent = entries.length;
     queueList.innerHTML = "";
 
-    const myKey = localStorage.getItem("tottus_my_entry");
+    let myKey = localStorage.getItem("tottus_my_entry");
+    const savedName = getSavedName();
+
+    // Si mi key local ya no coincide con nadie en la fila, pero mi NOMBRE sí está
+    // registrado (por ejemplo, entré por otro acceso: ícono vs link), lo reconectamos.
+    if (savedName) {
+      const normalizedSaved = savedName.trim().toLowerCase();
+      const matchByName = entries.find(
+        (e) => (e.name || "").trim().toLowerCase() === normalizedSaved
+      );
+      if (matchByName && matchByName.key !== myKey) {
+        myKey = matchByName.key;
+        localStorage.setItem("tottus_my_entry", myKey);
+      }
+    }
 
     // Si mi entrada ya no existe en la lista (fue borrada), reactivar formulario
     const stillInQueue = entries.some((e) => e.key === myKey);
