@@ -272,25 +272,20 @@
     if (localCooldownInterval) clearInterval(localCooldownInterval);
     cooldownBlocking = true;
 
-    async function tick() {
+    function tick() {
       const timeOk = Date.now() >= untilTimestamp;
-      if (!timeOk) return; // sigue bloqueado, sin revisar GPS aún (ahorra batería)
-
-      const dist = await silentLocationCheck();
-      const outsideRadius = dist === null ? false : dist > RADIUS_METERS;
-
-      if (timeOk && outsideRadius) {
+      if (timeOk) {
         clearInterval(localCooldownInterval);
         localCooldownInterval = null;
         localStorage.removeItem("tottus_local_cooldown_until");
         cooldownBlocking = false;
       }
-      // Si ya pasó el tiempo pero sigue dentro del radio, se mantiene bloqueado
-      // y se vuelve a intentar en el siguiente ciclo, en silencio.
+      // La verificación real de ubicación (dentro/fuera del radio) sigue ocurriendo
+      // normalmente al tocar "Verificar mi ubicación", una vez pasado este tiempo.
     }
 
     tick();
-    localCooldownInterval = setInterval(tick, 30000); // reintenta cada 30s
+    localCooldownInterval = setInterval(tick, 15000); // reintenta cada 15s
   }
 
   // Si al recargar la página todavía hay un bloqueo pendiente, retomarlo
