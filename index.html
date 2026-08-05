@@ -562,7 +562,13 @@
         btn2.style.background = "#fff8ea";
         btn2.style.color = "#a6740a";
         btn2.style.borderColor = "#e0c98a";
+        if (entry.assigned) {
+          btn2.disabled = true;
+          btn2.style.opacity = "0.4";
+          btn2.style.cursor = "not-allowed";
+        }
         btn2.onclick = () => {
+          if (entry.assigned) return; // seguridad extra, no debería poder tocarse igual
           if (confirm("¿Confirmas que quieres salir de la fila temporalmente? Cuando vuelvas deberás escribir tu nombre y marcar llegada de nuevo.")) {
             localStorage.removeItem("tottus_my_entry");
             localStorage.removeItem("tottus_saved_name");
