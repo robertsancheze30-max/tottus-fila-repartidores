@@ -434,58 +434,67 @@
       return;
     }
 
-    // Verificar en la fila compartida (Firebase) si ese nombre ya está registrado,
-    // sin importar desde qué dispositivo/entrada se intente marcar de nuevo.
-    const normalizedName = name.trim().toLowerCase();
-    const alreadyInQueue = lastEntries.some(
-      (e) => (e.name || "").trim().toLowerCase() === normalizedName
-    );
-    if (alreadyInQueue) {
-      alert(`${name} ya tiene un registro activo en la fila. Debes salir primero (Salir a entregar / Ausentarme) antes de volver a marcar llegada.`);
-      return;
-    }
-
     arriveBtn.disabled = true;
     arriveBtn.textContent = "Verificando...";
+    const normalizedName = name.trim().toLowerCase();
 
-    // Verificar cooldown compartido (20 min tras "Salir a entregar"), sin importar el dispositivo
-    cooldownRef.child(safeKey(name)).once("value").then((snap) => {
-      const lastExit = snap.val();
-      const minutesPassed = lastExit ? (Date.now() - lastExit) / 60000 : 999;
-      if (lastExit && minutesPassed < 20) {
-        const minutosFaltan = Math.ceil(20 - minutesPassed);
-        alert(`Debes esperar ${minutosFaltan} minuto(s) más antes de volver a marcar llegada.`);
+    // Verificar EN VIVO (no con la copia local) si ese nombre ya está registrado,
+    // sin importar desde qué dispositivo/navegador se intente marcar de nuevo.
+    queueRef.once("value").then((queueSnap) => {
+      const queueData = queueSnap.val() || {};
+      const alreadyInQueue = Object.values(queueData).some(
+        (v) => (v.name || "").trim().toLowerCase() === normalizedName
+      );
+      if (alreadyInQueue) {
+        alert(`${name} ya tiene un registro activo en la fila. Debes salir primero (Salir a entregar / Ausentarme) antes de volver a marcar llegada.`);
         arriveBtn.disabled = false;
         arriveBtn.textContent = "Marcar llegada";
         return;
       }
 
-      arriveBtn.textContent = "Marcando...";
-      const newRef = queueRef.push();
-      newRef
-        .set({
-          name: name,
-          timestamp: firebase.database.ServerValue.TIMESTAMP,
-        })
-        .then(() => {
-          localStorage.setItem("tottus_my_entry", newRef.key);
-          if (!saved) {
-            localStorage.setItem("tottus_saved_name", name);
-          }
-          nameInput.value = "";
-          refreshNameUI();
-          arriveBtn.style.display = "none";
-          checkBtn.disabled = true;
-          checkBtn.style.opacity = "0.5";
-          renderQueue(lastEntries);
-        })
-        .catch((err) => {
-          alert("Error al marcar llegada: " + err.message);
+      // Verificar cooldown compartido (20 min tras "Salir a entregar"), sin importar el dispositivo
+      cooldownRef.child(safeKey(name)).once("value").then((snap) => {
+        const lastExit = snap.val();
+        const minutesPassed = lastExit ? (Date.now() - lastExit) / 60000 : 999;
+        if (lastExit && minutesPassed < 20) {
+          const minutosFaltan = Math.ceil(20 - minutesPassed);
+          alert(`Debes esperar ${minutosFaltan} minuto(s) más antes de volver a marcar llegada.`);
           arriveBtn.disabled = false;
           arriveBtn.textContent = "Marcar llegada";
-        });
+          return;
+        }
+
+        arriveBtn.textContent = "Marcando...";
+        const newRef = queueRef.push();
+        newRef
+          .set({
+            name: name,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+          })
+          .then(() => {
+            localStorage.setItem("tottus_my_entry", newRef.key);
+            if (!saved) {
+              localStorage.setItem("tottus_saved_name", name);
+            }
+            nameInput.value = "";
+            refreshNameUI();
+            arriveBtn.style.display = "none";
+            checkBtn.disabled = true;
+            checkBtn.style.opacity = "0.5";
+            renderQueue(lastEntries);
+          })
+          .catch((err) => {
+            alert("Error al marcar llegada: " + err.message);
+            arriveBtn.disabled = false;
+            arriveBtn.textContent = "Marcar llegada";
+          });
+      }).catch((err) => {
+        alert("Error al verificar cooldown: " + err.message);
+        arriveBtn.disabled = false;
+        arriveBtn.textContent = "Marcar llegada";
+      });
     }).catch((err) => {
-      alert("Error al verificar: " + err.message);
+      alert("Error al verificar la fila: " + err.message);
       arriveBtn.disabled = false;
       arriveBtn.textContent = "Marcar llegada";
     });
