@@ -63,10 +63,7 @@
     background: #ffffff;
     border: 1px solid #e0e0e0;
   }
-  .queue-item.assigned {
-    background: #eefaf2;
-    border-color: #0a8a3f66;
-  }
+  .queue-item.assigned { background: #eefaf2; border-color: #0a8a3f66; }
   .check-wrap {
     flex-shrink: 0;
     display: flex;
@@ -85,16 +82,8 @@
     opacity: 0;
     cursor: pointer;
   }
-  .check-box {
-    font-size: 22px;
-    opacity: 0.25;
-    filter: grayscale(1);
-    transition: opacity 0.15s, filter 0.15s;
-  }
-  .check-wrap input[type="checkbox"]:checked + .check-box {
-    opacity: 1;
-    filter: grayscale(0);
-  }
+  .check-box { font-size: 22px; opacity: 0.25; filter: grayscale(1); transition: opacity 0.15s, filter 0.15s; }
+  .check-wrap input[type="checkbox"]:checked + .check-box { opacity: 1; filter: grayscale(0); }
   .position {
     width: 36px;
     height: 36px;
@@ -112,12 +101,7 @@
   .queue-info { flex: 1; min-width: 0; }
   .queue-name { font-size: 16px; font-weight: 600; }
   .queue-time { font-size: 13px; color: #777; }
-  .empty-msg {
-    text-align: center;
-    color: #999;
-    padding: 30px 0;
-    font-size: 15px;
-  }
+  .empty-msg { text-align: center; color: #999; padding: 30px 0; font-size: 15px; }
   .live-dot {
     width: 8px;
     height: 8px;
@@ -128,12 +112,7 @@
     animation: pulse 1.5s infinite;
   }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .live-row {
-    text-align: center;
-    font-size: 13px;
-    color: #888;
-    margin-top: 18px;
-  }
+  .live-row { text-align: center; font-size: 13px; color: #888; margin-top: 18px; }
 </style>
 </head>
 <body>
@@ -173,13 +152,22 @@
   const queueRef = db.ref("queue");
   const metaRef = db.ref("meta");
 
+  // ---------- HORA REAL DEL SERVIDOR (ignora la hora del celular) ----------
+  let serverTimeOffset = 0;
+  db.ref(".info/serverTimeOffset").on("value", (snap) => {
+    serverTimeOffset = snap.val() || 0;
+  });
+  function getServerNow() {
+    return new Date(Date.now() + serverTimeOffset);
+  }
+
   function getTodayDateString() {
-    const now = new Date();
+    const now = getServerNow();
     return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
   }
 
   function checkAutoReset() {
-    const now = new Date();
+    const now = getServerNow();
     if (now.getHours() < 21) return;
 
     const today = getTodayDateString();
@@ -217,10 +205,7 @@
     }
 
     entries.forEach((entry, idx) => {
-      const time = new Date(entry.timestamp).toLocaleTimeString("es-CL", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const time = new Date(entry.timestamp).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
 
       const item = document.createElement("div");
       item.className = "queue-item" + (entry.assigned ? " assigned" : "");
@@ -238,7 +223,6 @@
       queueList.appendChild(item);
     });
 
-    // Conectar cada checkbox a Firebase, verificando primero que el nodo siga existiendo
     document.querySelectorAll(".assign-check").forEach((box) => {
       box.addEventListener("change", (e) => {
         const key = e.target.getAttribute("data-key");
@@ -250,7 +234,6 @@
               e.target.disabled = false;
             });
           } else {
-            // El repartidor ya salió de la fila antes de que se aplicara el cambio
             e.target.checked = !checked;
             e.target.disabled = false;
           }
