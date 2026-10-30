@@ -150,38 +150,34 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
   const queueRef = db.ref("queue");
-  const metaRef = db.ref("meta");
 
-  // ---------- HORA REAL DEL SERVIDOR (ignora la hora del celular) ----------
+  // ---------- HORA REAL DEL SERVIDOR + LIMPIEZA DIARIA 9PM ----------
   let serverTimeOffset = 0;
-  db.ref(".info/serverTimeOffset").on("value", (snap) => {
-    serverTimeOffset = snap.val() || 0;
-  });
   function getServerNow() {
     return new Date(Date.now() + serverTimeOffset);
   }
 
-  function getTodayDateString() {
+  function cleanOldEntries() {
     const now = getServerNow();
-    return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-  }
+    const cutoff = new Date(now);
+    cutoff.setHours(21, 0, 0, 0);
+    if (now < cutoff) cutoff.setDate(cutoff.getDate() - 1);
 
-  function checkAutoReset() {
-    const now = getServerNow();
-    if (now.getHours() < 21) return;
-
-    const today = getTodayDateString();
-    metaRef.child("lastResetDate").once("value").then((snap) => {
-      const lastReset = snap.val();
-      if (lastReset !== today) {
-        queueRef.remove();
-        metaRef.child("lastResetDate").set(today);
-      }
+    queueRef.once("value").then((snap) => {
+      snap.forEach((child) => {
+        const v = child.val() || {};
+        if (!v.timestamp || v.timestamp < cutoff.getTime()) {
+          child.ref.remove();
+        }
+      });
     });
   }
 
-  checkAutoReset();
-  setInterval(checkAutoReset, 5 * 60000);
+  db.ref(".info/serverTimeOffset").on("value", (snap) => {
+    serverTimeOffset = snap.val() || 0;
+    cleanOldEntries();
+  });
+  setInterval(cleanOldEntries, 5 * 60000);
 
   const queueList = document.getElementById("queueList");
   const queueCount = document.getElementById("queueCount");
