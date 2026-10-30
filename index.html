@@ -178,39 +178,34 @@
   const db = firebase.database();
   const queueRef = db.ref("queue");
   const cooldownRef = db.ref("cooldown");
-  const metaRef = db.ref("meta");
 
-  // ---------- HORA REAL DEL SERVIDOR (ignora la hora del celular) ----------
+  // ---------- HORA REAL DEL SERVIDOR + LIMPIEZA DIARIA 9PM ----------
   let serverTimeOffset = 0;
-  db.ref(".info/serverTimeOffset").on("value", (snap) => {
-    serverTimeOffset = snap.val() || 0;
-  });
   function getServerNow() {
     return new Date(Date.now() + serverTimeOffset);
   }
 
-  // ---------- RESETEO AUTOMÁTICO DIARIO A LAS 9:00 PM (hora real del servidor) ----------
-  function getTodayDateString() {
+  function cleanOldEntries() {
     const now = getServerNow();
-    return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-  }
+    const cutoff = new Date(now);
+    cutoff.setHours(21, 0, 0, 0);
+    if (now < cutoff) cutoff.setDate(cutoff.getDate() - 1);
 
-  function checkAutoReset() {
-    const now = getServerNow();
-    if (now.getHours() < 21) return;
-
-    const today = getTodayDateString();
-    metaRef.child("lastResetDate").once("value").then((snap) => {
-      const lastReset = snap.val();
-      if (lastReset !== today) {
-        queueRef.remove();
-        metaRef.child("lastResetDate").set(today);
-      }
+    queueRef.once("value").then((snap) => {
+      snap.forEach((child) => {
+        const v = child.val() || {};
+        if (!v.timestamp || v.timestamp < cutoff.getTime()) {
+          child.ref.remove();
+        }
+      });
     });
   }
 
-  checkAutoReset();
-  setInterval(checkAutoReset, 5 * 60000);
+  db.ref(".info/serverTimeOffset").on("value", (snap) => {
+    serverTimeOffset = snap.val() || 0;
+    cleanOldEntries();
+  });
+  setInterval(cleanOldEntries, 5 * 60000);
 
   function safeKey(str) {
     return str.trim().toLowerCase().replace(/[.#$\[\]\/\s]+/g, "_");
@@ -237,20 +232,6 @@
   let watchStarted = false;
   let localCooldownInterval = null;
   let cooldownBlocking = false;
-
-  function silentLocationCheck() {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) { resolve(null); return; }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const dist = distanceMeters(pos.coords.latitude, pos.coords.longitude, STORE_LAT, STORE_LNG);
-          resolve(dist);
-        },
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 15000 }
-      );
-    });
-  }
 
   function startLocalCooldownDisplay(untilTimestamp) {
     if (localCooldownInterval) clearInterval(localCooldownInterval);
@@ -295,7 +276,6 @@
     nameInput.value = "";
     refreshNameUI();
   });
-  const myEntryKey = localStorage.getItem("tottus_my_entry") || null;
 
   function distanceMeters(lat1, lng1, lat2, lng2) {
     const R = 6371000;
@@ -386,7 +366,7 @@
 
       cooldownRef.child(safeKey(name)).once("value").then((snap) => {
         const lastExit = snap.val();
-        const minutesPassed = lastExit ? (Date.now() - lastExit) / 60000 : 999;
+        const minutesPassed = lastExit ? (getServerNow().getTime() - lastExit) / 60000 : 999;
         if (lastExit && minutesPassed < 20) {
           const minutosFaltan = Math.ceil(20 - minutesPassed);
           alert(`Debes esperar ${minutosFaltan} minuto(s) más antes de volver a marcar llegada.`);
